@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import dotenv from "dotenv";
 
 dotenv.config();
-
+1;
 export const sendSMS = async (req: Request, res: Response) => {
   const { phone, message } = req.body;
 
@@ -16,7 +16,6 @@ export const sendSMS = async (req: Request, res: Response) => {
         msisdn: msisdn,
         message,
         sender: "Demo",
-        force: "corporate",
         shorten_url: false,
       },
       {

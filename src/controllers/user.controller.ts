@@ -105,6 +105,11 @@ export const loginUser = async (req: Request, res: Response) => {
     res.status(200).json({
       message: "✅ เข้าสู่ระบบสำเร็จ",
       token, // ✅ เพิ่มบรรทัดนี้
+      user: {
+        name: user.first_name + " " + user.last_name,
+        email: user.email,
+        phone: user.phone,
+      },
     });
   } catch (error: any) {
     console.error("Login error:", error);
