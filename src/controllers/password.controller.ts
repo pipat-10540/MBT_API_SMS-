@@ -4,19 +4,18 @@ import pool from "../config/db";
 import bcrypt from "bcrypt";
 
 export const forgotPassword = async (req: Request, res: Response) => {
-  const { username } = req.body;
-
-  if (!username) {
-    return res.status(400).json({ message: "⚠️ กรุณากรอกชื่อผู้ใช้งาน" });
+  const { email } = req.body;
+  console.log("REQ BODY:", req.body);
+  if (!email) {
+    return res.status(400).json({ message: "⚠️ กรุณากรอกอีเมล" });
   }
 
   try {
     // ค้นหาผู้ใช้งานใน DB
     const [rows]: any = await pool.query(
-      "SELECT id, email, first_name FROM users WHERE email = ? OR phone = ? OR first_name = ?",
-      [username, username, username]
+      "SELECT id, email, first_name FROM users WHERE email = ?",
+      [email]
     );
-
     if (rows.length === 0) {
       return res.status(404).json({ message: "❌ ไม่พบผู้ใช้งานนี้" });
     }
@@ -56,38 +55,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error("❌ Send Mail Error:", err);
-    return res
-      .status(500)
-      .json({ message: "เกิดข้อผิดพลาด", error: err.message });
-  }
-};
-
-export const resetPassword = async (req: Request, res: Response) => {
-  const { userId, password } = req.body;
-
-  if (!userId || !password) {
-    return res
-      .status(400)
-      .json({ message: "กรุณาระบุ userId และรหัสผ่านใหม่" });
-  }
-
-  try {
-    // เข้ารหัสรหัสผ่านใหม่
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // อัปเดตรหัสผ่านในฐานข้อมูล
-    const [result]: any = await pool.query(
-      "UPDATE users SET password = ? WHERE id = ?",
-      [hashedPassword, userId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "ไม่พบผู้ใช้งาน" });
-    }
-
-    return res.json({ message: "✅ เปลี่ยนรหัสผ่านสำเร็จ" });
-  } catch (err: any) {
-    console.error("Reset Password Error:", err);
     return res
       .status(500)
       .json({ message: "เกิดข้อผิดพลาด", error: err.message });
