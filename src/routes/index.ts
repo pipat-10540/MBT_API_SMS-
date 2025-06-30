@@ -1,10 +1,10 @@
-import { Application } from "express";
 import userRoutes from "./user.routes";
+import express, { Router } from "express";
 
-export default class Routes {
-  constructor(app: Application) {
-    app.use("/api/users", userRoutes);
-    app.use("/api", userRoutes);
-    app.use("/webhook", userRoutes);
-  }
-}
+const router = express.Router();
+
+router.use("/api/users", userRoutes);
+// router.use("/api", userRoutes);
+// app.use("/webhook", userRoutes);
+
+export default router;

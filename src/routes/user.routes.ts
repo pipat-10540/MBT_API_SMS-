@@ -1,17 +1,20 @@
-import express from "express";
-import { registerUser, loginUser } from "../controllers/user.controller";
-import { forgotPassword } from "../controllers/password.controller";
-import { resetPassword } from "../controllers/reset.controller";
-import { sendSMS } from "../controllers/sms.controller";
-import { handleSmsWebhook } from "../controllers/thaibulk.controller";
+import { Router } from "express";
+import UserController from "../controllers/user.controller";
 
-const router = express.Router();
+class UserRoutes {
+  router = Router();
+  controller = new UserController();
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
-router.post("/send-sms", sendSMS);
-router.get("/sms-status", handleSmsWebhook);
-
-export default router;
+  constructor() {
+    this.intializeRoutes();
+  }
+  intializeRoutes() {
+    this.router.post("/register", this.controller.registerUser);
+    this.router.post("/login", this.controller.loginUser);
+    this.router.post("/forgot-password", this.controller.forgotPassword);
+    this.router.post("/reset-password", this.controller.resetPassword);
+    this.router.post("/send-sms", this.controller.sendSMS);
+    this.router.get("/sms-status", this.controller.handleSmsWebhook);
+  }
+}
+export default new UserRoutes().router;
