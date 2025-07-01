@@ -136,7 +136,7 @@ export default class UserController {
       return res.status(200).json({
         success: true,
         message: "✅ เข้าสู่ระบบสำเร็จ",
-        Max: {
+        data: {
           token, // ✅ เพิ่มบรรทัดนี้
           firstname: user.first_name + " " + user.last_name,
         },
@@ -148,7 +148,7 @@ export default class UserController {
         success: false,
         message: "❌ เกิดข้อผิดพลาด",
         statusCode: 404,
-        Max: error,
+        data: error,
       });
     }
   }
@@ -291,7 +291,7 @@ export default class UserController {
         success: true,
         message: "success",
         statusCode: 200,
-        Max: response.data,
+        data: response.data,
       });
     } catch (error: any) {
       console.error(
