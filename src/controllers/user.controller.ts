@@ -73,10 +73,10 @@ export default class UserController {
       });
     } catch (error: any) {
       console.error("❌ Error:", error);
-      return res.status(500).json({
+      return res.status(404).json({
         success: false,
         message: "❌ สมัครไม่สำเร็จ",
-        statusCode: 500,
+        statusCode: 404,
       });
     }
   }
@@ -136,7 +136,7 @@ export default class UserController {
       return res.status(200).json({
         success: true,
         message: "✅ เข้าสู่ระบบสำเร็จ",
-        data: {
+        Max: {
           token, // ✅ เพิ่มบรรทัดนี้
           firstname: user.first_name + " " + user.last_name,
         },
@@ -144,25 +144,25 @@ export default class UserController {
       });
     } catch (error: any) {
       console.error("Login error:", error);
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
         message: "❌ เกิดข้อผิดพลาด",
-        statusCode: 400,
-        data: error,
+        statusCode: 404,
+        Max: error,
       });
     }
   }
   //#endregion
 
   //#region forgotPassword
-  async forgotPassword(req: Request, res: Response<apiResponse<signIn>>) {
+  async forgotPassword(req: Request, res: Response<apiResponse>) {
     const { email } = req.body;
     console.log("REQ BODY:", req.body);
     if (!email) {
-      return res.status(400).json({
+      return res.status(200).json({
         success: false,
         message: "⚠️ กรุณากรอกอีเมล",
-        statusCode: 400,
+        statusCode: 200,
       });
     }
 
@@ -173,10 +173,10 @@ export default class UserController {
         [email]
       );
       if (rows.length === 0) {
-        return res.status(404).json({
+        return res.status(200).json({
           success: false,
           message: "❌ ไม่พบผู้ใช้งานนี้",
-          statusCode: 400,
+          statusCode: 200,
         });
       }
 
@@ -213,13 +213,13 @@ export default class UserController {
         success: true,
         message:
           "✅ ส่งอีเมลสำหรับรีเซ็ตรหัสผ่านไปยังอีเมลที่ลงทะเบียนไว้แล้ว กรุณาตรวจสอบอีเมลของคุณ",
-        statusCode: 500,
+        statusCode: 200,
       });
     } catch (err: any) {
       console.error("❌ Send Mail Error:", err);
       return res
-        .status(500)
-        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 500 });
+        .status(404)
+        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 404 });
     }
   }
   //#endregion
@@ -227,7 +227,7 @@ export default class UserController {
   //#region resetPassword
   async resetPassword(
     req: Request,
-    res: Response<apiResponse<signIn>>
+    res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     const { userId, newPassword } = req.body;
 
@@ -239,8 +239,8 @@ export default class UserController {
       );
       if (result.affectedRows === 0) {
         return res
-          .status(400)
-          .json({ success: false, message: "❌ ไม่พบผู้ใช้", statusCode: 400 });
+          .status(200)
+          .json({ success: false, message: "❌ ไม่พบผู้ใช้", statusCode: 200 });
       }
 
       return res.status(200).json({
@@ -251,8 +251,8 @@ export default class UserController {
     } catch (error: any) {
       console.error("❌ Reset Error:", error);
       return res
-        .status(500)
-        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 500 });
+        .status(404)
+        .json({ success: false, message: "เกิดข้อผิดพลาด", statusCode: 404 });
     }
   }
   //#endregion
@@ -260,7 +260,7 @@ export default class UserController {
   //#region sendSMS
   async sendSMS(
     req: Request,
-    res: Response<apiResponse<signIn>>
+    res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     const { phone, message } = req.body;
 
@@ -291,24 +291,27 @@ export default class UserController {
         success: true,
         message: "success",
         statusCode: 200,
-        data: response.data,
+        Max: response.data,
       });
     } catch (error: any) {
       console.error(
         "❌ ThaiBulkSMS Error:",
         error.response?.data || error.message
       );
-      return res.status(500).json({
+      return res.status(404).json({
         success: false,
         message: "error",
-        statusCode: 500,
+        statusCode: 404,
       });
     }
   }
   //#endregion
 
   //#region handleSmsWebhook
-  async handleSmsWebhook(req: Request, res: Response) {
+  async handleSmsWebhook(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
     const {
       message_id,
       msisdn,
@@ -333,7 +336,11 @@ export default class UserController {
 
     // TODO: บันทึก log หรืออัปเดตสถานะในฐานข้อมูลได้ที่นี่
 
-    res.status(200).send("OK");
+    return res.status(200).json({
+      success: true,
+      message: "success",
+      statusCode: 200,
+    });
   }
   //#endregion
 }
