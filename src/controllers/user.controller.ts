@@ -6,8 +6,9 @@ import { serialize } from "cookie";
 import nodemailer from "nodemailer";
 import axios from "axios";
 import dotenv from "dotenv";
-import { apiResponse } from "../model/response_standard";
-import { signIn } from "../model/signin_interface";
+import { apiResponse } from "../model/response/response_standard";
+import { signIn } from "../model/response/signin_interface";
+import { sendSMS } from "../model/request/sendSMS";
 
 dotenv.config();
 
@@ -259,21 +260,32 @@ export default class UserController {
 
   //#region sendSMS
   async sendSMS(
-    req: Request,
+    req: Request<any, any, sendSMS>,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const { phone, message } = req.body;
-
-    const msisdn = phone.startsWith("0") ? "66" + phone.slice(1) : phone;
+    const {
+      msisdn,
+      message,
+      sender,
+      scheduled_delivery,
+      force,
+      Shorten_url,
+      tracking_url,
+      expire,
+    } = req.body;
 
     try {
       const response = await axios.post(
         "https://api-v2.thaibulksms.com/sms",
         {
-          msisdn: msisdn,
+          msisdn,
           message,
-          sender: "Demo",
-          shorten_url: false,
+          sender,
+          scheduled_delivery,
+          force,
+          Shorten_url,
+          tracking_url,
+          expire,
         },
         {
           auth: {
@@ -285,8 +297,40 @@ export default class UserController {
           },
         }
       );
-      console.log("response_thaibulksms", response);
+      // console.log("response_thaibulksms", response);
 
+      const sql = `
+      INSERT INTO sms_send
+      (msisdn, message, sender, force_type, scheduled_delivery, 
+      shorten_url, tracking_url, expire, api_status, api_response)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
+    `;
+      const toNullable = (value: any) =>
+        value === "" || value === undefined ? null : value;
+      //สร้างฟังก์ชั่นที่จะเปลี่ยนข้อมูลเป็น null ถ้าไม่รู้ชนิดข้อมูล
+
+      await pool.query(sql, [
+        msisdn,
+        message,
+        sender,
+        force,
+        scheduled_delivery,
+        Shorten_url,
+        tracking_url,
+        expire,
+        "success",
+        JSON.stringify(response.data),
+      ]);
+      console.log("ข้อมูลที่บันทึกลง database", {
+        msisdn,
+        message,
+        sender,
+        scheduled_delivery,
+        force,
+        Shorten_url,
+        tracking_url,
+        expire,
+      });
       return res.status(200).json({
         success: true,
         message: "success",
