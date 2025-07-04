@@ -45,7 +45,7 @@ export default class UserController {
           statusCode: 200,
         });
       }
-
+      //เขียนโค้ดให้ดีๆหน่อย
       // เข้ารหัสรหัสผ่านก่อนเก็บ
       const hashedPassword = await bcrypt.hash(password, 10);
 
