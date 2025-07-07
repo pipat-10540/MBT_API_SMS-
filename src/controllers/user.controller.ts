@@ -387,4 +387,60 @@ export default class UserController {
     });
   }
   //#endregion
+
+  //#region contactUser
+  async contactUser(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const {
+      user_id,
+      first_name,
+      last_name,
+      phone,
+      email,
+      birth_date,
+      group_id,
+      group_name,
+      status,
+      create_date,
+      last_update,
+    } = req.body;
+
+    try {
+      const sql = `
+      INSERT INTO contact
+      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+      await pool.query(sql, [
+        user_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        birth_date,
+        group_id,
+        group_name,
+        status,
+        create_date,
+        last_update,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ สมัครสมาชิกสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
 }
