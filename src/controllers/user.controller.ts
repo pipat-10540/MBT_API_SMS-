@@ -443,4 +443,120 @@ export default class UserController {
     }
   }
   //#endregion
+
+  //#region contactUpdateUser
+  async contactUpdateUser(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const { id } = req.params;
+    const {
+      user_id,
+      first_name,
+      last_name,
+      phone,
+      email,
+      birth_date,
+      group_id,
+      group_name,
+      status,
+      create_date,
+      last_update,
+    } = req.body;
+
+    const sql = `
+      update contact set 
+      user_id = ?, first_name = ?, last_name = ?, phone = ?, email = ?, 
+      birth_date = ?, group_id = ?, group_name = ?, status = ?, create_date = ?,
+      last_update = ?
+      where id = ?;
+    `;
+
+    try {
+      await pool.query(sql, [
+        user_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        birth_date,
+        group_id,
+        group_name,
+        status,
+        create_date,
+        last_update,
+        id,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ อัพเดทสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ อัพเดทไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region contactgroups
+  async contactgroups(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const {
+      user_id,
+      first_name,
+      last_name,
+      phone,
+      email,
+      birth_date,
+      group_id,
+      group_name,
+      status,
+      create_date,
+      last_update,
+    } = req.body;
+
+    try {
+      const sql = `
+      INSERT INTO contact
+      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+      await pool.query(sql, [
+        user_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        birth_date,
+        group_id,
+        group_name,
+        status,
+        create_date,
+        last_update,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ สมัครสมาชิกสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
 }

@@ -15,6 +15,7 @@ class UserRoutes {
     this.router.post("/reset-password", this.controller.resetPassword);
     this.router.post("/send-sms", this.controller.sendSMS);
     this.router.post("/contactUser", this.controller.contactUser);
+    this.router.put("/contactUpdateUser/:id", this.controller.contactUpdateUser);
     this.router.get("/sms-status", this.controller.handleSmsWebhook);
   }
 }
