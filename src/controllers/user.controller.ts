@@ -578,4 +578,40 @@ export default class UserController {
     }
   }
   //#endregion
+
+  //#region contactGetgroups
+  async contactGetgroups(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const { id } = req.params;
+
+    const sql = `
+      SELECT 
+        id,
+        group_name,
+        contact_id,
+        create_date,
+        last_update
+      FROM contact_groups
+      WHERE id = ?;
+    `;
+    try {
+      await pool.query(sql, [id]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ ค้นหาสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ ค้นหาไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
 }
