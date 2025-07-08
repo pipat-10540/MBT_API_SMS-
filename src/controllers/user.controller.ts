@@ -552,40 +552,16 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const {
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      email,
-      birth_date,
-      group_id,
-      group_name,
-      status,
-      create_date,
-      last_update,
-    } = req.body;
+    const { group_name, contact_id, create_date, last_update } = req.body;
 
     try {
       const sql = `
-      INSERT INTO contact
-      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO contact_groups
+      (group_name, contact_id, create_date, last_update)
+      VALUES (?, ?, ?, ?)
     `;
 
-      await pool.query(sql, [
-        user_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        birth_date,
-        group_id,
-        group_name,
-        status,
-        create_date,
-        last_update,
-      ]);
+      await pool.query(sql, [group_name, contact_id, create_date, last_update]);
 
       return res.status(200).json({
         success: true,

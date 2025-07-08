@@ -17,6 +17,7 @@ class UserRoutes {
     this.router.get("/contactGetUser/:id", this.controller.contactGetUser);
     this.router.post("/contactUser", this.controller.contactUser);
     this.router.put("/contactUpdateUser/:id", this.controller.contactUpdateUser);
+    this.router.post("/contactgroups", this.controller.contactgroups);
     this.router.get("/sms-status", this.controller.handleSmsWebhook);
   }
 }
