@@ -4,13 +4,11 @@
   "description": "Rest API using Node.js, TypeScript, Express",
   "main": "server.ts",
   "scripts": {
-  "test": "echo \"Error: no test specified\" && exit 1",
-  "build": "tsc",
-  "dev": "ts-node-dev --respawn --transpile-only server.ts"
-,
-  "start": "tsc && npm run dev"
-}
-,
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only server.ts",
+    "start": "tsc && npm run dev"
+  },
   "keywords": [
     "express",
     "typescript",
@@ -44,6 +42,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.1",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "zod": "^3.25.76"
   }
 }
