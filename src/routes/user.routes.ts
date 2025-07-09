@@ -16,12 +16,18 @@ class UserRoutes {
     this.router.post("/send-sms", this.controller.sendSMS);
     this.router.get("/contactGetUser/:id", this.controller.contactGetUser);
     this.router.post("/contactUser", this.controller.contactUser);
-    this.router.put(
-      "/contactUpdateUser/:id",
-      this.controller.contactUpdateUser
-    );
+    this.router.put("/contactUpdateUser", this.controller.contactUpdateUser);
+    this.router.post("/contactDelete", this.controller.contactDelete);
     this.router.post("/contactgroups", this.controller.contactgroups);
     this.router.get("/contactGetgroups/:id", this.controller.contactGetgroups);
+    this.router.put(
+      "/contactUpdategroups",
+      this.controller.contactUpdategroups
+    );
+    this.router.post(
+      "/contactDeletegroups",
+      this.controller.contactDeletegroups
+    );
     this.router.get("/sms-status", this.controller.handleSmsWebhook);
   }
 }
