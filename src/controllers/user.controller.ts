@@ -9,6 +9,8 @@ import dotenv from "dotenv";
 import { apiResponse } from "../model/response/response_standard";
 import { signIn } from "../model/response/signin_interface";
 import { sendSMS } from "../model/request/sendSMS";
+import { contactSchema, DeleteSchema } from "../model/request/contactUse";
+import { DeletegroupsSchema, groupsSchema } from "../model/request/groups";
 
 dotenv.config();
 
@@ -388,6 +390,86 @@ export default class UserController {
   }
   //#endregion
 
+  //#region contactUser
+  async contactUser(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = contactSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        console.log("result.error.errors", result.error.errors);
+        return res.status(404).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 404,
+        });
+      }
+      const data = result.data;
+
+      const [emailChecking] = await pool.query(
+        "SELECT id FROM contact WHERE email = ? ",
+        [data.email, data.id]
+      );
+
+      if ((emailChecking as any[]).length > 0) {
+        return res.status(200).json({
+          success: false,
+          message: "อีเมลนี้มีอยู่แล้วในระบบ",
+          statusCode: 200,
+        });
+      }
+      const [phoneChecking] = await pool.query(
+        "SELECT id FROM contact WHERE phone = ? ",
+        [data.phone, data.id]
+      );
+
+      if ((phoneChecking as any[]).length > 0) {
+        return res.status(200).json({
+          success: false,
+          message: "เบอร์นี้มีอยู่แล้วในระบบ",
+          statusCode: 200,
+        });
+      }
+      const sql = `
+      INSERT INTO contact
+      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+      await pool.query(sql, [
+        data.user_id,
+        data.first_name,
+        data.last_name,
+        data.phone,
+        data.email,
+        data.birth_date,
+        data.group_id,
+        data.group_name,
+        data.status,
+        data.create_date,
+        data.last_update,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ สมัครสมาชิกสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
   //#region contacGetUser
   async contactGetUser(
     req: Request,
@@ -431,83 +513,26 @@ export default class UserController {
   }
   //#endregion
 
-  //#region contactUser
-  async contactUser(
-    req: Request,
-    res: Response<apiResponse>
-  ): Promise<Response<apiResponse>> {
-    const {
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      email,
-      birth_date,
-      group_id,
-      group_name,
-      status,
-      create_date,
-      last_update,
-    } = req.body;
-
-    try {
-      const sql = `
-      INSERT INTO contact
-      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-      await pool.query(sql, [
-        user_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        birth_date,
-        group_id,
-        group_name,
-        status,
-        create_date,
-        last_update,
-      ]);
-
-      return res.status(200).json({
-        success: true,
-        message: "✅ สมัครสมาชิกสำเร็จ",
-        statusCode: 200,
-      });
-    } catch (error: any) {
-      console.error("❌ Error:", error);
-      return res.status(404).json({
-        success: false,
-        message: "❌ สมัครไม่สำเร็จ",
-        statusCode: 404,
-      });
-    }
-  }
-  //#endregion
-
   //#region contactUpdateUser
   async contactUpdateUser(
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const { id } = req.params;
-    const {
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      email,
-      birth_date,
-      group_id,
-      group_name,
-      status,
-      create_date,
-      last_update,
-    } = req.body;
-
-    const sql = `
+    try {
+      const result = contactSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        console.log("result.error.errors", result.error.errors);
+        return res.status(404).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 404,
+        });
+      }
+      const data = result.data;
+      const sql = `
       update contact set 
       user_id = ?, first_name = ?, last_name = ?, phone = ?, email = ?, 
       birth_date = ?, group_id = ?, group_name = ?, status = ?, create_date = ?,
@@ -515,20 +540,19 @@ export default class UserController {
       where id = ?;
     `;
 
-    try {
       await pool.query(sql, [
-        user_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        birth_date,
-        group_id,
-        group_name,
-        status,
-        create_date,
-        last_update,
-        id,
+        data.user_id,
+        data.first_name,
+        data.last_name,
+        data.phone,
+        data.email,
+        data.birth_date,
+        data.group_id,
+        data.group_name,
+        data.status,
+        data.create_date,
+        data.last_update,
+        data.id,
       ]);
 
       return res.status(200).json({
@@ -547,21 +571,67 @@ export default class UserController {
   }
   //#endregion
 
+  //#region contactDelete
+  async contactDelete(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = DeletegroupsSchema.safeParse(req.body);
+      const del = result.data?.id.map(() => "?").join(",");
+      const id = result.data?.id;
+      const sql = `
+      delete from contact where id IN (${del})
+    `;
+      await pool.query(sql, id);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ ลบข้อมูลสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
   //#region contactgroups
   async contactgroups(
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const { group_name, contact_id, create_date, last_update } = req.body;
-
     try {
+      const result = groupsSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        console.log("result.error.errors", result.error.errors);
+        return res.status(404).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 404,
+        });
+      }
+      const data = result.data;
       const sql = `
       INSERT INTO contact_groups
       (group_name, contact_id, create_date, last_update)
       VALUES (?, ?, ?, ?)
     `;
 
-      await pool.query(sql, [group_name, contact_id, create_date, last_update]);
+      await pool.query(sql, [
+        data.group_name,
+        data.contact_id,
+        data.create_date,
+        data.last_update,
+      ]);
 
       return res.status(200).json({
         success: true,
@@ -609,6 +679,85 @@ export default class UserController {
       return res.status(404).json({
         success: false,
         message: "❌ ค้นหาไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region contactUpdategroups
+  async contactUpdategroups(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = groupsSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        console.log("result.error.errors", result.error.errors);
+        return res.status(404).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 404,
+        });
+      }
+      const data = result.data;
+      const sql = `
+      update contact_groups set 
+      group_name = ?, contact_id = ?,create_date = ?, last_update = ?
+      where id = ?;
+    `;
+
+      await pool.query(sql, [
+        data.group_name,
+        data.contact_id,
+        data.create_date,
+        data.last_update,
+        data.id,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ อัพเดทสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ อัพเดทไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region contactDeletegroups
+  async contactDeletegroups(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = DeleteSchema.safeParse(req.body);
+      const del = result.data?.id.map(() => "?").join(",");
+      const id = result.data?.id;
+      const sql = `
+      delete from contact_groups where id IN (${del})
+    `;
+      await pool.query(sql, id);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ ลบข้อมูลสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
         statusCode: 404,
       });
     }
