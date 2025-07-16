@@ -11,6 +11,7 @@ import { signIn } from "../model/response/signin_interface";
 import { sendSMS } from "../model/request/sendSMS";
 import { contactSchema, DeleteSchema } from "../model/request/contactUse";
 import { DeletegroupsSchema, groupsSchema } from "../model/request/groups";
+import { any } from "zod";
 
 dotenv.config();
 
@@ -299,7 +300,7 @@ export default class UserController {
           },
         }
       );
-      // console.log("response_thaibulksms", response);
+      console.log("response", response);
 
       const sql = `
       INSERT INTO sms_send
@@ -347,6 +348,45 @@ export default class UserController {
       return res.status(404).json({
         success: false,
         message: "error",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region Getsms
+  async contactGetSms(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    const sql = `
+  SELECT 
+    id,
+    msisdn,
+    message,
+    sender,
+    scheduled_delivery,
+    force_type,
+    Shorten_url,
+    tracking_url,
+    expire,
+    created_at
+  FROM sms_send;
+`;
+    try {
+      const [rows] = (await pool.query(sql)) as any;
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ ค้นหาสำเร็จ",
+        statusCode: 200,
+        data: rows,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ ค้นหาไม่สำเร็จ",
         statusCode: 404,
       });
     }
@@ -495,12 +535,13 @@ export default class UserController {
       WHERE id = ?;
     `;
     try {
-      await pool.query(sql, [id]);
+      const [rows] = (await pool.query(sql, [id])) as any;
 
       return res.status(200).json({
         success: true,
         message: "✅ ค้นหาสำเร็จ",
         statusCode: 200,
+        data: rows[0],
       });
     } catch (error: any) {
       console.error("❌ Error:", error);
@@ -667,12 +708,13 @@ export default class UserController {
       WHERE id = ?;
     `;
     try {
-      await pool.query(sql, [id]);
+      const [rows] = (await pool.query(sql, [id])) as any;
 
       return res.status(200).json({
         success: true,
         message: "✅ ค้นหาสำเร็จ",
         statusCode: 200,
+        data: rows[0],
       });
     } catch (error: any) {
       console.error("❌ Error:", error);
