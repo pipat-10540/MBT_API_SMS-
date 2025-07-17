@@ -476,22 +476,16 @@ export default class UserController {
       }
       const sql = `
       INSERT INTO contact
-      (user_id, first_name, last_name, phone, email, birth_date, group_id, group_name, status, create_date, last_update)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ( first_name, last_name, phone, email, birth_date)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
       await pool.query(sql, [
-        data.user_id,
         data.first_name,
         data.last_name,
         data.phone,
         data.email,
         data.birth_date,
-        data.group_id,
-        data.group_name,
-        data.status,
-        data.create_date,
-        data.last_update,
       ]);
 
       return res.status(200).json({
