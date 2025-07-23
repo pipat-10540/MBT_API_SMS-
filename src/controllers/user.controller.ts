@@ -509,8 +509,6 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const { id } = req.params;
-
     const sql = `
       SELECT 
         id,
@@ -525,17 +523,16 @@ export default class UserController {
         status,
         create_date,
         last_update
-      FROM contact 
-      WHERE id = ?;
+      FROM contact ;
     `;
     try {
-      const [rows] = (await pool.query(sql, [id])) as any;
+      const [rows] = (await pool.query(sql)) as any;
 
       return res.status(200).json({
         success: true,
         message: "✅ ค้นหาสำเร็จ",
         statusCode: 200,
-        data: rows[0],
+        data: rows,
       });
     } catch (error: any) {
       console.error("❌ Error:", error);
@@ -689,8 +686,6 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const { id } = req.params;
-
     const sql = `
       SELECT 
         id,
@@ -699,16 +694,16 @@ export default class UserController {
         create_date,
         last_update
       FROM contact_groups
-      WHERE id = ?;
+      ;
     `;
     try {
-      const [rows] = (await pool.query(sql, [id])) as any;
+      const [rows] = (await pool.query(sql)) as any;
 
       return res.status(200).json({
         success: true,
         message: "✅ ค้นหาสำเร็จ",
         statusCode: 200,
-        data: rows[0],
+        data: rows,
       });
     } catch (error: any) {
       console.error("❌ Error:", error);
