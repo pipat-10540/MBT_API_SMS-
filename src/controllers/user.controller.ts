@@ -551,11 +551,13 @@ export default class UserController {
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     try {
+      
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
         const errors = result.error.errors.map(
           (err) => `${err.path.join(",")}:${err.message}`
         );
+
         console.log("result.error.errors", result.error.errors);
         return res.status(404).json({
           success: false,
