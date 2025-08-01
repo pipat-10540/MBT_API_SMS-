@@ -551,7 +551,6 @@ export default class UserController {
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     try {
-      
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
         const errors = result.error.errors.map(
@@ -737,16 +736,16 @@ export default class UserController {
         });
       }
       const data = result.data;
+
       const sql = `
       update contact_groups set 
-      group_name = ?, contact_id = ?,create_date = ?, last_update = ?
+      group_name = ?, contact_id = ?, last_update = ?
       where id = ?;
     `;
 
       await pool.query(sql, [
         data.group_name,
         data.contact_id,
-        data.create_date,
         data.last_update,
         data.id,
       ]);
