@@ -92,6 +92,7 @@ export default class UserController {
     res: Response<apiResponse<signIn>>
   ): Promise<Response<apiResponse>> {
     const { email, password } = req.body;
+    console.log(req.body);
     try {
       const [users]: any = await pool.query(
         "SELECT * FROM users WHERE email = ? OR phone = ?",
@@ -141,9 +142,11 @@ export default class UserController {
         success: true,
         message: "✅ เข้าสู่ระบบสำเร็จ",
         data: {
+          users_id: user.id,
           token, // ✅ เพิ่มบรรทัดนี้
           firstname: user.first_name + " " + user.last_name,
         },
+
         statusCode: 200,
       });
     } catch (error: any) {
@@ -435,6 +438,7 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
+    console.log("contactUse",req.body)
     try {
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
@@ -476,11 +480,12 @@ export default class UserController {
       }
       const sql = `
       INSERT INTO contact
-      ( first_name, last_name, phone, email, birth_date)
-      VALUES (?, ?, ?, ?, ?)
+      ( user_id,first_name, last_name, phone, email, birth_date)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
       await pool.query(sql, [
+        data.user_id,
         data.first_name,
         data.last_name,
         data.phone,
@@ -783,6 +788,54 @@ export default class UserController {
       return res.status(200).json({
         success: true,
         message: "✅ ลบข้อมูลสำเร็จ",
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ สมัครไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region countgroups
+  async countgroups(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = groupsSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        console.log("result.error.errors", result.error.errors);
+        return res.status(404).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 404,
+        });
+      }
+      const data = result.data;
+      const sql = `
+      INSERT INTO countgroups
+      (group_name, contact_id, create_date, last_update)
+      VALUES (?, ?, ?, ?)
+    `;
+
+      await pool.query(sql, [
+        data.group_name,
+        data.contact_id,
+        data.create_date,
+        data.last_update,
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ สมัครสมาชิกสำเร็จ",
         statusCode: 200,
       });
     } catch (error: any) {
