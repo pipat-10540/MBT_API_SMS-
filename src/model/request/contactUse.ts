@@ -10,8 +10,9 @@ export const contactSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  group_id: z.number().optional(),
+  group_id: z.number().nullable().optional(), // ✅ รองรับ null value
   group_name: z.string().optional(),
+  group_ids: z.array(z.number()).optional(), // ✅ เพิ่มรองรับ multiple groups
   status: z.boolean().optional(),
   create_date: z.string().optional(),
   last_update: z.string().optional(),
