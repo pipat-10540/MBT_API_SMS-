@@ -29,6 +29,8 @@ class UserRoutes {
       "/contactDeletegroups",
       this.controller.contactDeletegroups
     );
+    this.router.post("/removeFromGroup", this.controller.removeFromGroup);
+    this.router.post("/contactAddToGroup", this.controller.contactAddToGroup);
     this.router.get("/sms-status", this.controller.handleSmsWebhook);
   }
 }
