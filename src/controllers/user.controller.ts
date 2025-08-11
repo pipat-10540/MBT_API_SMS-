@@ -438,7 +438,7 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    console.log("contactUse",req.body)
+    console.log("contactUse", req.body);
     try {
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
@@ -514,24 +514,54 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
-    const sql = `
-      SELECT 
-        id,
-        user_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        birth_date,
-        group_id,
-        group_name,
-        status,
-        create_date,
-        last_update
-      FROM contact ;
+    const { group_id } = req.query;
+    console.log("📥 contactGetUser called with group_id:", group_id);
+
+    let sql = `
+      SELECT DISTINCT
+        c.id,
+        c.user_id,
+        c.first_name,
+        c.last_name,
+        c.phone,
+        c.email,
+        c.birth_date,
+        cg.groups_id as group_id,
+        g.group_name,
+        c.status,
+        c.create_date,
+        c.last_update
+      FROM contact c
     `;
+
+    const queryParams: any[] = [];
+
+    // ถ้ามี group_id ให้ JOIN กับตาราง count_groups และ contact_groups
+    if (group_id) {
+      sql += `
+        INNER JOIN count_groups cg ON c.id = cg.contact_id
+        INNER JOIN contact_groups g ON cg.groups_id = g.id
+        WHERE cg.groups_id = ?
+      `;
+      queryParams.push(group_id);
+      console.log("🔍 Using INNER JOIN for group_id:", group_id);
+    } else {
+      // ถ้าไม่มี group_id ให้แสดงทั้งหมด (LEFT JOIN เพื่อแสดงข้อมูลที่ไม่อยู่ในกลุ่มด้วย)
+      sql += `
+        LEFT JOIN count_groups cg ON c.id = cg.contact_id
+        LEFT JOIN contact_groups g ON cg.groups_id = g.id
+      `;
+      console.log("🔍 Using LEFT JOIN for all contacts");
+    }
+
+    sql += ` ORDER BY c.create_date DESC`;
+    console.log("📝 Final SQL:", sql);
+    console.log("📋 Query params:", queryParams);
+
     try {
-      const [rows] = (await pool.query(sql)) as any;
+      const [rows] = (await pool.query(sql, queryParams)) as any;
+      console.log("📊 Query result rows:", rows);
+      console.log("📊 Number of rows found:", rows.length);
 
       return res.status(200).json({
         success: true,
@@ -543,7 +573,7 @@ export default class UserController {
       console.error("❌ Error:", error);
       return res.status(404).json({
         success: false,
-        message: "❌ อัพเดทไม่สำเร็จ",
+        message: "❌ ดึงข้อมูลไม่สำเร็จ",
         statusCode: 404,
       });
     }
@@ -556,54 +586,130 @@ export default class UserController {
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     try {
+      console.log("📥 Received contactUpdateUser request:", req.body);
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
         const errors = result.error.errors.map(
           (err) => `${err.path.join(",")}:${err.message}`
         );
 
-        console.log("result.error.errors", result.error.errors);
+        console.log("❌ Validation errors:", result.error.errors);
         return res.status(404).json({
           success: false,
-          message: `${errors.join(",")}`,
+          message: `Validation failed: ${errors.join(", ")}`,
           statusCode: 404,
         });
       }
+
       const data = result.data;
-      const sql = `
-      update contact set 
-      user_id = ?, first_name = ?, last_name = ?, phone = ?, email = ?, 
-      birth_date = ?, group_id = ?, group_name = ?, status = ?, create_date = ?,
-      last_update = ?
-      where id = ?;
-    `;
+      console.log("🔄 Updating contact with data:", data);
 
-      await pool.query(sql, [
-        data.user_id,
-        data.first_name,
-        data.last_name,
-        data.phone,
-        data.email,
-        data.birth_date,
-        data.group_id,
-        data.group_name,
-        data.status,
-        data.create_date,
-        data.last_update,
-        data.id,
-      ]);
+      // 🚀 ใช้ Transaction เพื่อความปลอดภัย
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
 
-      return res.status(200).json({
-        success: true,
-        message: "✅ อัพเดทสำเร็จ",
-        statusCode: 200,
-      });
+      try {
+        // 1️⃣ อัปเดต contact table
+        const updateContactSql = `
+          UPDATE contact SET 
+          user_id = ?, first_name = ?, last_name = ?, phone = ?, email = ?, 
+          birth_date = ?, group_id = ?, group_name = ?, status = ?, create_date = ?,
+          last_update = ?
+          WHERE id = ?;
+        `;
+
+        await connection.query(updateContactSql, [
+          data.user_id,
+          data.first_name,
+          data.last_name,
+          data.phone,
+          data.email,
+          data.birth_date,
+          data.group_id,
+          data.group_name,
+          data.status,
+          data.create_date,
+          data.last_update,
+          data.id,
+        ]);
+
+        // 2️⃣ จัดการ group relationships
+        console.log("🔍 Processing group relationships...");
+        console.log("📋 data.group_ids:", data.group_ids);
+        console.log("📋 data.group_id:", data.group_id);
+        
+        // ✅ เฉพาะเมื่อมีการส่ง group_ids หรือ group_id มาใหม่ เท่านั้นจึงจะอัปเดต relationships
+        if (
+          (data.group_ids && Array.isArray(data.group_ids) && data.group_ids.length > 0) ||
+          data.group_id
+        ) {
+          // ลบ entries เก่าใน count_groups สำหรับ contact นี้
+          const deleteOldGroupsSql = `
+            DELETE FROM count_groups WHERE contact_id = ?;
+          `;
+          await connection.query(deleteOldGroupsSql, [data.id]);
+          console.log(
+            `🗑️ Deleted old group relationships for contact ${data.id}`
+          );
+
+          // เพิ่ม entries ใหม่ใน count_groups (รองรับหลายกลุ่ม)
+          if (
+            data.group_ids &&
+            Array.isArray(data.group_ids) &&
+            data.group_ids.length > 0
+          ) {
+            // ✅ รองรับหลายกลุ่มผ่าน group_ids array
+            const insertNewGroupSql = `
+              INSERT INTO count_groups (groups_id, contact_id) 
+              VALUES (?, ?);
+            `;
+
+            for (const groupId of data.group_ids) {
+              await connection.query(insertNewGroupSql, [groupId, data.id]);
+              console.log(
+                `✅ Added group relationship: contact ${data.id} -> group ${groupId}`
+              );
+            }
+
+            console.log(`🎯 Total groups added: ${data.group_ids.length}`);
+          } else if (data.group_id) {
+            // 🔄 รองรับ backward compatibility กับ group_id เดียว
+            const insertNewGroupSql = `
+              INSERT INTO count_groups (groups_id, contact_id) 
+              VALUES (?, ?);
+            `;
+            await connection.query(insertNewGroupSql, [data.group_id, data.id]);
+            console.log(
+              `✅ Added single group relationship: contact ${data.id} -> group ${data.group_id}`
+            );
+          }
+        } else {
+          console.log("🔄 No group changes requested, keeping existing relationships");
+        }
+
+        // 4️⃣ Commit transaction
+        await connection.commit();
+        console.log("✅ Transaction committed successfully");
+
+        return res.status(200).json({
+          success: true,
+          message: "✅ อัพเดทสำเร็จ รวมถึงการจัดการกลุ่ม",
+          statusCode: 200,
+        });
+      } catch (transactionError) {
+        // ❌ Rollback on error
+        await connection.rollback();
+        console.error("❌ Transaction rolled back:", transactionError);
+        throw transactionError;
+      } finally {
+        connection.release();
+      }
     } catch (error: any) {
-      console.error("❌ Error:", error);
-      return res.status(404).json({
+      console.error("❌ contactUpdateUser Error:", error);
+      return res.status(500).json({
         success: false,
-        message: "❌ อัพเดทไม่สำเร็จ",
-        statusCode: 404,
+        message: "❌ อัพเดทไม่สำเร็จ: " + (error.message || "เกิดข้อผิดพลาด"),
+        statusCode: 500,
       });
     }
   }
@@ -616,23 +722,51 @@ export default class UserController {
   ): Promise<Response<apiResponse>> {
     try {
       const result = DeletegroupsSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 400,
+        });
+      }
       const del = result.data?.id.map(() => "?").join(",");
       const id = result.data?.id;
-      const sql = `
-      delete from contact where id IN (${del})
-    `;
-      await pool.query(sql, id);
+      await pool.query("START TRANSACTION");
 
-      return res.status(200).json({
-        success: true,
-        message: "✅ ลบข้อมูลสำเร็จ",
-        statusCode: 200,
-      });
+      try {
+        // 1. ลบความสัมพันธ์ใน count_groups ก่อน
+        const deleteCountGroupsSql = `
+          DELETE FROM count_groups WHERE contact_id IN (${del})
+        `;
+        await pool.query(deleteCountGroupsSql, id);
+
+        // 2. ลบข้อมูลใน contact
+        const deleteContactSql = `
+          DELETE FROM contact WHERE id IN (${del})
+        `;
+        await pool.query(deleteContactSql, id);
+
+        // Commit transaction
+        await pool.query("COMMIT");
+
+        return res.status(200).json({
+          success: true,
+          message: "✅ ลบข้อมูลสำเร็จ",
+          statusCode: 200,
+        });
+      } catch (transactionError) {
+        // Rollback transaction ถ้าเกิดข้อผิดพลาด
+        await pool.query("ROLLBACK");
+        throw transactionError;
+      }
     } catch (error: any) {
-      console.error("❌ Error:", error);
+      console.error("❌ contactDelete Error:", error);
       return res.status(404).json({
         success: false,
-        message: "❌ สมัครไม่สำเร็จ",
+        message: "❌ ลบข้อมูลไม่สำเร็จ",
         statusCode: 404,
       });
     }
@@ -694,12 +828,19 @@ export default class UserController {
   ): Promise<Response<apiResponse>> {
     const sql = `
       SELECT 
-        id,
-        group_name,
-        contact_id,
-        create_date,
-        last_update
-      FROM contact_groups
+      cg.id,
+        cg.group_name,
+        cg.contact_id,
+        cg.create_date,
+        cg.last_update,
+        COUNT(ccg.contact_id) as contact_count,
+        COUNT(CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN 1 END) as phone_count,
+        COUNT(CASE WHEN c.email IS NOT NULL AND c.email != '' THEN 1 END) as email_count
+      FROM contact_groups cg
+      LEFT JOIN count_groups ccg ON cg.id = ccg.groups_id
+      LEFT JOIN contact c ON ccg.contact_id = c.id
+      GROUP BY cg.id, cg.group_name, cg.contact_id, cg.create_date, cg.last_update
+      ORDER BY cg.create_date DESC
       ;
     `;
     try {
@@ -778,23 +919,52 @@ export default class UserController {
   ): Promise<Response<apiResponse>> {
     try {
       const result = DeleteSchema.safeParse(req.body);
+      if (result.success === false) {
+        const errors = result.error.errors.map(
+          (err) => `${err.path.join(",")}:${err.message}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: `${errors.join(",")}`,
+          statusCode: 400,
+        });
+      }
       const del = result.data?.id.map(() => "?").join(",");
       const id = result.data?.id;
-      const sql = `
-      delete from contact_groups where id IN (${del})
-    `;
-      await pool.query(sql, id);
+      // เริ่ม transaction
+      await pool.query("START TRANSACTION");
 
-      return res.status(200).json({
-        success: true,
-        message: "✅ ลบข้อมูลสำเร็จ",
-        statusCode: 200,
-      });
+      try {
+        // 1. ลบความสัมพันธ์ใน count_groups ก่อน
+        const deleteCountGroupsSql = `
+          DELETE FROM count_groups WHERE groups_id IN (${del})
+        `;
+        await pool.query(deleteCountGroupsSql, id);
+
+        // 2. ลบข้อมูลใน contact_groups
+        const deleteGroupsSql = `
+          DELETE FROM contact_groups WHERE id IN (${del})
+        `;
+        await pool.query(deleteGroupsSql, id);
+
+        // Commit transaction
+        await pool.query("COMMIT");
+
+        return res.status(200).json({
+          success: true,
+          message: "✅ ลบข้อมูลสำเร็จ",
+          statusCode: 200,
+        });
+      } catch (transactionError) {
+        // Rollback transaction ถ้าเกิดข้อผิดพลาด
+        await pool.query("ROLLBACK");
+        throw transactionError;
+      }
     } catch (error: any) {
-      console.error("❌ Error:", error);
+      console.error("❌ contactDeletegroups Error:", error);
       return res.status(404).json({
         success: false,
-        message: "❌ สมัครไม่สำเร็จ",
+        message: "❌ ลบข้อมูลไม่สำเร็จ",
         statusCode: 404,
       });
     }
@@ -806,8 +976,49 @@ export default class UserController {
     req: Request,
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
+    const sql = `
+      SELECT 
+        id,
+        user_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        birth_date,
+        group_id,
+        group_name,
+        status,
+        create_date,
+        last_update
+      FROM contact ;
+    `;
     try {
-      const result = groupsSchema.safeParse(req.body);
+      const [rows] = (await pool.query(sql)) as any;
+
+      return res.status(200).json({
+        success: true,
+        message: "✅ ค้นหาสำเร็จ",
+        statusCode: 200,
+        data: rows,
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+      return res.status(404).json({
+        success: false,
+        message: "❌ อัพเดทไม่สำเร็จ",
+        statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region contactAddToGroup
+  async contactAddToGroup(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
         const errors = result.error.errors.map(
           (err) => `${err.path.join(",")}:${err.message}`
@@ -819,31 +1030,211 @@ export default class UserController {
           statusCode: 404,
         });
       }
+
       const data = result.data;
-      const sql = `
-      INSERT INTO countgroups
-      (group_name, contact_id, create_date, last_update)
-      VALUES (?, ?, ?, ?)
-    `;
 
-      await pool.query(sql, [
-        data.group_name,
-        data.contact_id,
-        data.create_date,
-        data.last_update,
-      ]);
+      // ตรวจสอบว่ามี group_id
+      if (!data.group_id) {
+        return res.status(400).json({
+          success: false,
+          message: "ต้องระบุ group_id",
+          statusCode: 400,
+        });
+      }
 
-      return res.status(200).json({
-        success: true,
-        message: "✅ สมัครสมาชิกสำเร็จ",
-        statusCode: 200,
-      });
+      // ตรวจสอบว่ามี user_id
+      if (!data.user_id) {
+        return res.status(400).json({
+          success: false,
+          message: "ต้องระบุ user_id",
+          statusCode: 400,
+        });
+      }
+
+      // ตรวจสอบว่ากลุ่มมีอยู่จริง
+      const [groupExists] = await pool.query(
+        "SELECT id FROM contact_groups WHERE id = ?",
+        [data.group_id]
+      );
+
+      if ((groupExists as any[]).length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "ไม่พบกลุ่มที่ระบุ",
+          statusCode: 400,
+        });
+      }
+
+      // ตรวจสอบอีเมลซ้ำ
+      const [emailChecking] = await pool.query(
+        "SELECT id FROM contact WHERE email = ?",
+        [data.email]
+      );
+
+      if ((emailChecking as any[]).length > 0) {
+        return res.status(200).json({
+          success: false,
+          message: "อีเมลนี้มีอยู่แล้วในระบบ",
+          statusCode: 200,
+        });
+      }
+
+      // ตรวจสอบเบอร์โทรซ้ำ
+      const [phoneChecking] = await pool.query(
+        "SELECT id FROM contact WHERE phone = ?",
+        [data.phone]
+      );
+
+      if ((phoneChecking as any[]).length > 0) {
+        return res.status(200).json({
+          success: false,
+          message: "เบอร์นี้มีอยู่แล้วในระบบ",
+          statusCode: 200,
+        });
+      }
+
+      // เริ่ม transaction
+      await pool.query("START TRANSACTION");
+
+      try {
+        // 1. บันทึกข้อมูลรายชื่อลงตาราง contact
+        const contactSql = `
+          INSERT INTO contact
+          (first_name, last_name, phone, email, birth_date, user_id)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
+
+        const [contactResult]: any = await pool.query(contactSql, [
+          data.first_name,
+          data.last_name,
+          data.phone,
+          data.email,
+          data.birth_date,
+          data.user_id,
+        ]);
+
+        const contactId = contactResult.insertId;
+
+        // 2. บันทึกความสัมพันธ์ลงตาราง count_groups
+        const countGroupsSql = `
+          INSERT INTO count_groups
+          (groups_id, contact_id)
+          VALUES (?, ?)
+        `;
+
+        await pool.query(countGroupsSql, [data.group_id, contactId]);
+
+        // Commit transaction
+        await pool.query("COMMIT");
+
+        return res.status(200).json({
+          success: true,
+          message: "✅ เพิ่มรายชื่อเข้ากลุ่มสำเร็จ",
+          statusCode: 200,
+          data: {
+            contact_id: contactId,
+            group_id: data.group_id,
+          },
+        });
+      } catch (transactionError) {
+        // Rollback transaction ถ้าเกิดข้อผิดพลาด
+        await pool.query("ROLLBACK");
+        throw transactionError;
+      }
     } catch (error: any) {
-      console.error("❌ Error:", error);
+      console.error("❌ contactAddToGroup Error:", error);
       return res.status(404).json({
         success: false,
-        message: "❌ สมัครไม่สำเร็จ",
+        message: "❌ ไม่สามารถเพิ่มรายชื่อเข้ากลุ่มได้",
         statusCode: 404,
+      });
+    }
+  }
+  //#endregion
+
+  //#region removeFromGroup - ลบสมาชิกออกจากกลุ่ม
+  async removeFromGroup(
+    req: Request,
+    res: Response<apiResponse>
+  ): Promise<Response<apiResponse>> {
+    try {
+      const { contact_ids, group_id } = req.body;
+
+      // ตรวจสอบข้อมูลที่จำเป็น
+      if (
+        !contact_ids ||
+        !Array.isArray(contact_ids) ||
+        contact_ids.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "ต้องระบุ contact_ids เป็น array",
+          statusCode: 400,
+        });
+      }
+
+      if (!group_id) {
+        return res.status(400).json({
+          success: false,
+          message: "ต้องระบุ group_id",
+          statusCode: 400,
+        });
+      }
+
+      // ตรวจสอบว่ากลุ่มมีอยู่จริง
+      const [groupExists] = await pool.query(
+        "SELECT id FROM contact_groups WHERE id = ?",
+        [group_id]
+      );
+
+      if ((groupExists as any[]).length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "ไม่พบกลุ่มที่ระบุ",
+          statusCode: 400,
+        });
+      }
+
+      // เริ่ม transaction
+      await pool.query("START TRANSACTION");
+
+      try {
+        // ลบความสัมพันธ์จากตาราง count_groups
+        const placeholders = contact_ids.map(() => "?").join(",");
+        const deleteSql = `
+          DELETE FROM count_groups 
+          WHERE contact_id IN (${placeholders}) AND groups_id = ?
+        `;
+
+        const [deleteResult]: any = await pool.query(deleteSql, [
+          ...contact_ids,
+          group_id,
+        ]);
+
+        // Commit transaction
+        await pool.query("COMMIT");
+
+        return res.status(200).json({
+          success: true,
+          message: `✅ ลบสมาชิก ${deleteResult.affectedRows} คนออกจากกลุ่มสำเร็จ`,
+          statusCode: 200,
+          data: {
+            removed_count: deleteResult.affectedRows,
+            contact_ids: contact_ids,
+            group_id: group_id,
+          },
+        });
+      } catch (transactionError) {
+        // Rollback transaction ถ้าเกิดข้อผิดพลาด
+        await pool.query("ROLLBACK");
+        throw transactionError;
+      }
+    } catch (error: any) {
+      console.error("❌ removeFromGroup Error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "❌ ไม่สามารถลบสมาชิกออกจากกลุ่มได้",
+        statusCode: 500,
       });
     }
   }
