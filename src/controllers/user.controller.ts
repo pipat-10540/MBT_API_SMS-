@@ -10,7 +10,11 @@ import { apiResponse } from "../model/response/response_standard";
 import { signIn } from "../model/response/signin_interface";
 import { sendSMS } from "../model/request/sendSMS";
 import { contactSchema, DeleteSchema } from "../model/request/contactUse";
-import { DeletegroupsSchema, groupsSchema } from "../model/request/groups";
+import {
+  DeletegroupsSchema,
+  groupsSchema,
+  addExistingContactsToGroupSchema,
+} from "../model/request/groups";
 import { any } from "zod";
 
 dotenv.config();
@@ -637,10 +641,12 @@ export default class UserController {
         console.log("🔍 Processing group relationships...");
         console.log("📋 data.group_ids:", data.group_ids);
         console.log("📋 data.group_id:", data.group_id);
-        
+
         // ✅ เฉพาะเมื่อมีการส่ง group_ids หรือ group_id มาใหม่ เท่านั้นจึงจะอัปเดต relationships
         if (
-          (data.group_ids && Array.isArray(data.group_ids) && data.group_ids.length > 0) ||
+          (data.group_ids &&
+            Array.isArray(data.group_ids) &&
+            data.group_ids.length > 0) ||
           data.group_id
         ) {
           // ลบ entries เก่าใน count_groups สำหรับ contact นี้
@@ -684,7 +690,9 @@ export default class UserController {
             );
           }
         } else {
-          console.log("🔄 No group changes requested, keeping existing relationships");
+          console.log(
+            "🔄 No group changes requested, keeping existing relationships"
+          );
         }
 
         // 4️⃣ Commit transaction
@@ -1018,6 +1026,84 @@ export default class UserController {
     res: Response<apiResponse>
   ): Promise<Response<apiResponse>> {
     try {
+      // 1) กรณีเพิ่ม "รายชื่อใหม่" และระบุกลุ่ม -> ใช้ contactSchema (ทำงานเดิม)
+      // 2) กรณีเพิ่ม "รายชื่อที่มีอยู่แล้วหลายคน" เข้ากลุ่ม -> ใช้ addExistingContactsToGroupSchema
+
+      // เช็คว่า body มี contact_ids หรือไม่ ถ้ามีให้ตีความว่าเป็นการเพิ่มรายชื่อที่มีอยู่แล้วเข้ากลุ่ม
+      if (Array.isArray((req.body as any)?.contact_ids)) {
+        const parsed = addExistingContactsToGroupSchema.safeParse(req.body);
+        if (!parsed.success) {
+          const errors = parsed.error.errors
+            .map((err) => `${err.path.join(",")}:${err.message}`)
+            .join(", ");
+
+          return res.status(400).json({
+            success: false,
+            message: errors,
+            statusCode: 400,
+          });
+        }
+
+        const { contact_ids, group_id } = parsed.data;
+
+        // ตรวจสอบว่ากลุ่มมีอยู่จริง
+        const [groupExists] = await pool.query(
+          "SELECT id FROM contact_groups WHERE id = ?",
+          [group_id]
+        );
+        if ((groupExists as any[]).length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "ไม่พบกลุ่มที่ระบุ",
+            statusCode: 400,
+          });
+        }
+
+        // เพิ่มเฉพาะความสัมพันธ์ที่ยังไม่มีอยู่ใน count_groups
+        const placeholders = contact_ids.map(() => "(? , ?)").join(",");
+        const values: any[] = [];
+
+        // หา contact ที่ยังไม่ได้อยู่ในกลุ่มนี้
+        const idsPlaceholder = contact_ids.map(() => "?").join(",");
+        const [existing] = await pool.query(
+          `SELECT contact_id FROM count_groups WHERE groups_id = ? AND contact_id IN (${idsPlaceholder})`,
+          [group_id, ...contact_ids]
+        );
+        const existingIds = new Set(
+          (existing as any[]).map((r) => r.contact_id)
+        );
+        const idsToInsert = contact_ids.filter((id) => !existingIds.has(id));
+
+        if (idsToInsert.length === 0) {
+          return res.status(200).json({
+            success: true,
+            message: "ไม่มีสมาชิกใหม่ต้องเพิ่ม (ซ้ำทั้งหมด)",
+            statusCode: 200,
+            data: { inserted: 0, group_id, contact_ids: [] },
+          });
+        }
+
+        idsToInsert.forEach((cid) => {
+          values.push(group_id, cid);
+        });
+
+        const sql = `INSERT INTO count_groups (groups_id, contact_id) VALUES ${idsToInsert
+          .map(() => "(?, ?)")
+          .join(",")}`;
+
+        const [insertResult]: any = await pool.query(sql, values);
+
+        return res.status(200).json({
+          success: true,
+          message: `✅ เพิ่มสมาชิกใหม่ ${idsToInsert.length} คนเข้ากลุ่มสำเร็จ`,
+          statusCode: 200,
+          data: {
+            inserted: idsToInsert.length,
+            group_id,
+            contact_ids: idsToInsert,
+          },
+        });
+      }
       const result = contactSchema.safeParse(req.body);
       if (result.success === false) {
         const errors = result.error.errors.map(
@@ -1062,34 +1148,6 @@ export default class UserController {
           success: false,
           message: "ไม่พบกลุ่มที่ระบุ",
           statusCode: 400,
-        });
-      }
-
-      // ตรวจสอบอีเมลซ้ำ
-      const [emailChecking] = await pool.query(
-        "SELECT id FROM contact WHERE email = ?",
-        [data.email]
-      );
-
-      if ((emailChecking as any[]).length > 0) {
-        return res.status(200).json({
-          success: false,
-          message: "อีเมลนี้มีอยู่แล้วในระบบ",
-          statusCode: 200,
-        });
-      }
-
-      // ตรวจสอบเบอร์โทรซ้ำ
-      const [phoneChecking] = await pool.query(
-        "SELECT id FROM contact WHERE phone = ?",
-        [data.phone]
-      );
-
-      if ((phoneChecking as any[]).length > 0) {
-        return res.status(200).json({
-          success: false,
-          message: "เบอร์นี้มีอยู่แล้วในระบบ",
-          statusCode: 200,
         });
       }
 

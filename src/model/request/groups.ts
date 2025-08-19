@@ -10,4 +10,10 @@ export const groupsSchema = z.object({
 export const DeletegroupsSchema = z.object({
   id: z.array(z.number()),
 });
+
+export const addExistingContactsToGroupSchema = z.object({
+  contact_ids: z.array(z.number()),
+  group_id: z.number(),
+});
+
 export type contact = z.infer<typeof groupsSchema>;
